@@ -1,50 +1,24 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.options import Options
-import os
+def get_xpath(driver, element):
+    components = []
+    current = element
 
-proxy_host = "your_proxy_host"
-proxy_port = "your_proxy_port"
-proxy_username = "your_proxy_username"
-proxy_password = "your_proxy_password"
+    while current is not None:
+        parent = driver.execute_script("return arguments[0].parentNode;", current)
+        if parent is None:
+            break
 
-def create_firefox_driver(proxy_host, proxy_port, proxy_username, proxy_password):
-    firefox_options = Options()
-    
-    profile = webdriver.FirefoxProfile()
-    profile.set_preference("network.proxy.type", 1)
-    profile.set_preference("network.proxy.http", proxy_host)
-    profile.set_preference("network.proxy.http_port", int(proxy_port))
-    profile.set_preference("network.proxy.ssl", proxy_host)
-    profile.set_preference("network.proxy.ssl_port", int(proxy_port))
-    profile.set_preference("network.proxy.ftp", proxy_host)
-    profile.set_preference("network.proxy.ftp_port", int(proxy_port))
-    profile.set_preference("network.proxy.socks", proxy_host)
-    profile.set_preference("network.proxy.socks_port", int(proxy_port))
-    
-    profile.set_preference("network.proxy.no_proxies_on", "localhost, 127.0.0.1")
-    
-    profile.set_preference("network.proxy.share_proxy_settings", True)
-    profile.set_preference("network.proxy.autoconfig_url", "")
-    profile.set_preference("signon.autologin.proxy", True)
-    
-    profile.set_preference("network.http.phishy-userpass-length", 255)
-    
-    profile.set_preference("network.automatic-ntlm-auth.allow-proxies", True)
-    profile.set_preference("network.negotiate-auth.allow-proxies", True)
-    profile.set_preference("network.negotiate-auth.delegation-uris", proxy_host)
-    profile.set_preference("network.negotiate-auth.trusted-uris", proxy_host)
-    
-    profile.set_preference("network.auth.use-sspi", False)
-    profile.set_preference("network.automatic-ntlm-auth.allow-non-fqdn", True)
-    profile.set_preference("network.negotiate-auth.allow-non-fqdn", True)
-    profile.set_preference("network.auth.force-generic-ntlm", True)
-    profile.set_preference("network.auth.force-generic-ntlm-v2", True)
-    
-    profile.set_preference("network.proxy.username", proxy_username)
-    profile.set_preference("network.proxy.password", proxy_password)
+        parent_tag_name = driver.execute_script("return arguments[0].tagName;", parent)
+        if parent_tag_name is None:
+            break
 
-    driver = webdriver.Firefox(firefox_profile=profile, options=firefox_options)
-    return driver
+        siblings = driver.execute_script("return Array.prototype.filter.call(arguments[0].children, child => child.tagName.toLowerCase() === arguments[1]);", parent, current.tag_name)
+        index = ""
 
-# main関数
+        if len(siblings) > 1:
+            index = siblings.index(current) + 1
+            index = f'[{index}]'
+
+        components.insert(0, f'{current.tag_name}{index}')
+        current = parent if parent_tag_name.lower() != 'html' else None
+
+    return '/html/' + '/'.join(components)
