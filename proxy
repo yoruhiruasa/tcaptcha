@@ -1,24 +1,51 @@
-def get_xpath(driver, element):
-    components = []
-    current = element
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import sys
 
-    while current is not None:
-        parent = driver.execute_script("return arguments[0].parentNode;", current)
-        if parent is None:
-            break
+def get_links(url, proxy, max_recursion_depth, current_depth=0):
+    # 再帰の深さが指定された最大深さを超えたら終了
+    if current_depth > max_recursion_depth:
+        return
 
-        parent_tag_name = driver.execute_script("return arguments[0].tagName;", parent)
-        if parent_tag_name is None:
-            break
+    # 指定したURLにプロキシを使ってアクセス
+    try:
+        response = requests.get(url, proxies=proxy, timeout=5)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error accessing {url}: {e}")
+        return
 
-        siblings = driver.execute_script("return Array.prototype.filter.call(arguments[0].children, child => child.tagName.toLowerCase() === arguments[1]);", parent, current.tag_name)
-        index = ""
+    # 取得したHTMLを解析
+    soup = BeautifulSoup(response.content, "html.parser")
 
-        if len(siblings) > 1:
-            index = siblings.index(current) + 1
-            index = f'[{index}]'
+    # ハイパーリンクをすべて抽出
+    links = soup.find_all("a")
 
-        components.insert(0, f'{current.tag_name}{index}')
-        current = parent if parent_tag_name.lower() != 'html' else None
+    # 抽出したリンクを再帰的にアクセス
+    for link in links:
+        href = link.get("href")
+        if href:
+            full_url = urljoin(url, href)
+            print(f"Depth {current_depth}: {full_url}")
+            get_links(full_url, proxy, max_recursion_depth, current_depth + 1)
 
-    return '/html/' + '/'.join(components)
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <start_url> [max_recursion_depth]")
+        sys.exit(1)
+
+    start_url = sys.argv[1]
+    max_recursion_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 2
+
+    proxy_auth = "user:password"
+    proxy_url = "http://proxy.example.com:8080"
+    proxy = {
+        "http": f"http://{proxy_auth}@{proxy_url}",
+        "https": f"http://{proxy_auth}@{proxy_url}",
+    }
+
+    get_links(start_url, proxy, max_recursion_depth)
+
+if __name__ == "__main__":
+    main()
